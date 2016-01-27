@@ -2,6 +2,7 @@ from flask import Flask, jsonify, abort, request, make_response, url_for
 from flask.ext.httpauth import HTTPBasicAuth
 import config as cf
 import mailer
+#import requests
 
 app = Flask(__name__, static_url_path = "")
 auth = HTTPBasicAuth()
@@ -14,7 +15,7 @@ def get_password(username):
 
 @auth.error_handler
 def unauthorized():
-    return (make_response(jsonify( { 'error': 'Unauthorized access' } ), 401))
+    return (make_response(jsonify( { 'error': 'Unauthorized access' } ), 403))
     # return 403 instead of 401 to prevent browsers from displaying the default auth dialog
     
 @app.errorhandler(400)
@@ -58,15 +59,15 @@ def validate_line2(line, el):
         total = 0.0
         ship = 0.0
         try:
-                unit = float(line[5].strip('$'))
+                unit = float(str(line[5]).strip('$'))
         except ValueError:
                 el.append("UnitCostValueError: The unit cost field must be numeric")
         try:
-                total = float(line[6].strip('$'))
+                total = float(str(line[6]).strip('$'))
         except ValueError:
                 el.append("CostValueError: The total cost field must be numeric")
         try:
-                ship = float(line[7].strip('$'))
+                ship = float(str(line[7]).strip('$'))
                 if not(((unit*int(line[4])) + ship) == total):
                         el.append("MathError: The unit price times the quantity, plus the shipping cost does not equal the total cost")
         except ValueError:
@@ -74,11 +75,38 @@ def validate_line2(line, el):
         
         return el
 
+def validate_line3(line, el):
+        if(len(line[2]) > 0):
+                #Is URL valid?
+                try:
+                    r = requests.get(line[2])
+                    if r.status_code != 200:
+                        el.append("URLError: The supplied URL is not a valid link, please either fix the URL or leave the field blank")
+                except:
+                        raise
+                        el.append("URLError: The supplied URL is not a valid link, please either fix the URL or leave the field blank")
+        return el
+
 def handle_errors(req, el):
     message = "Please correct the following errors in your order list entry:\n\n"
     message += '\n'.join(el)
     message += '\n\nRegards,\nThe ITR order list robot'
-    mailer.mail(['nashkaminski@localhost'],'Order list change rejected',message)
+    rcpts = [] 
+    if(len(req[9]) > 0) and (req[9].lower() in cf.name_email):
+        rcpts.append(cf.name_email[req[9].lower()])
+    if(len(req[10]) > 0) and (req[10].lower() in cf.name_email):
+        rcpts.append(cf.name_email[req[10].lower()])
+    if(len(rcpts) > 0):
+        mailer.mail(rcpts,'Order list change rejected',message)
+    else:
+        mailer.mail(cf.def_fail_rcpts,'Order list change rejected',message)
+
+def handle_success(req):
+    message = "An item on the ITR order sheet has been changed or added:\n\n"
+    message += "Item Name: %s\n Vendor: %s\n Total Price: %s\n Requestor:%s\n Approver:%s" % (req[0],req[3],req[6],req[9],req[10])
+    message += '\n\nRegards,\nThe ITR order list robot'
+    mailer.mail(cf.success_rcpts,'ITR Order list Change/Request',message)
+
 
 
 @app.route('/api/v1/itr_order', methods = ['POST'])
@@ -97,7 +125,13 @@ def handle_order():
         if(len(el) > 0):
             handle_errors(request.json,el)
             abort(400)
+        #3rd tier of checks
+        #el = validate_line3(request.json,el)
+        #if(len(el) > 0):
+        #    handle_errors(request.json,el)
+        #    abort(400)
 
+        handle_success(request.json)
         return(jsonify( { 'status' : 'true' } ), 201)
 
 @app.route('/api/v1/itr_lookup', methods = ['GET'])
@@ -115,4 +149,4 @@ def lookup_name():
     #    abort(400)
     return(jsonify( { 'status' : 'true' } ), 200)
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug = True)
+    app.run(host='0.0.0.0',port=8080, debug = True)
