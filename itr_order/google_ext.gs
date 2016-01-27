@@ -27,7 +27,7 @@ function handleEdit(sheet, dataRange){
       Logger.log(row.getBackground());
     if(row.getBackground() == '#00ff00'){
       resp = doPost(JSON.stringify(row.getValues()[0]));
-      if(resp == 200){
+      if(resp == 200 || resp == 201){
         resp = row.setBackground('#9900FF');
       } else if(resp == 400){
         resp = row.setBackground('#FF0000');
