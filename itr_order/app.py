@@ -88,18 +88,8 @@ def validate_line3(line, el):
         return el
 
 def handle_errors(req, el):
-    message = "Please correct the following errors in your order list entry:\n\n"
-    message += '\n'.join(el)
-    message += '\n\nRegards,\nThe ITR order list robot'
-    rcpts = [] 
-    if(len(req[9]) > 0) and (req[9].lower() in cf.name_email):
-        rcpts.append(cf.name_email[req[9].lower()])
-    if(len(req[10]) > 0) and (req[10].lower() in cf.name_email):
-        rcpts.append(cf.name_email[req[10].lower()])
-    if(len(rcpts) > 0):
-        mailer.mail(rcpts,'Order list change rejected',message)
-    else:
-        mailer.mail(cf.def_fail_rcpts,'Order list change rejected',message)
+    message = '  --  '.join(el)
+    return(jsonify( { 'status' : 'false' , 'message' : message} ), 400)
 
 def handle_success(req):
     message = "An item on the ITR order sheet has been changed or added:\n\n"
@@ -118,13 +108,11 @@ def handle_order():
         #1st level validation
         el = validate_line(request.json,el)
         if(len(el) > 0):
-            handle_errors(request.json,el)
-            abort(400)
+            return handle_errors(request.json,el)
         #2nd tier of checks
         el = validate_line2(request.json,el)
         if(len(el) > 0):
-            handle_errors(request.json,el)
-            abort(400)
+            return handle_errors(request.json,el)
         #3rd tier of checks
         #el = validate_line3(request.json,el)
         #if(len(el) > 0):
@@ -132,7 +120,7 @@ def handle_order():
         #    abort(400)
 
         handle_success(request.json)
-        return(jsonify( { 'status' : 'true' } ), 201)
+        return(jsonify( { 'status' : 'true' , 'message' : 'Order list change being processed automatically'} ), 201)
 
 @app.route('/api/v1/itr_lookup', methods = ['GET'])
 @auth.login_required

@@ -21,16 +21,23 @@ function onChange(e){
 
 function handleEdit(sheet, dataRange){
   var numRows = dataRange.getNumRows();
-  var row, resp;
+  var row, resp, rc, rdata;
   for (var i = 1; i <= numRows; i++) {
       row = sheet.getRange(dataRange.getCell(i,1).getRow(), 1, 1, 12)
       Logger.log(row.getBackground());
     if(row.getBackground() == '#00ff00'){
       resp = doPost(JSON.stringify(row.getValues()[0]));
-      if(resp == 200 || resp == 201){
-        resp = row.setBackground('#9900FF');
-      } else if(resp == 400){
-        resp = row.setBackground('#FF0000');
+      rc = resp.getResponseCode();
+      if(rc == 200 || rc == 201){
+        rdata = JSON.parse(resp.getContentText());
+        //Logger.log(resp.getContentText());
+        Browser.msgBox('Order list change on row '+String(row.getRow())+" accepted.", Browser.Buttons.OK);
+        row.setBackground('#9900FF');
+      } else if(rc == 400){
+        rdata = JSON.parse(resp.getContentText());
+        //Logger.log(resp.getContentText());
+        Browser.msgBox('Please correct the following issues on row '+String(row.getRow())+":\n"+rdata.message, Browser.Buttons.OK);
+        row.setBackground('#FF0000');
      }
   }
  }
@@ -51,6 +58,6 @@ function doPost(str){
 
   var response = UrlFetchApp.fetch("https://kaminski.pw/order_list/api/v1/itr_order", options);
   Logger.log(response.getResponseCode());
-  return response.getResponseCode();
+  return response;
 }
 
